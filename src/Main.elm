@@ -1,8 +1,9 @@
 module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest)
+import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Element, alignRight, centerY, el, fill, padding, rgb255, row, spacing, text, width)
+import Element exposing (Device, Element, alignRight, centerY, el, fill, padding, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -113,9 +114,10 @@ type Msg
     | GetNextPage
     | ClickedLink UrlRequest
     | ChangedUrl Url
+    | DeviceClassified Device
 
 
-main : Program Decode.Value Model Msg
+main : Program Flags Model Msg
 main =
     Browser.application
         { init = init
@@ -132,12 +134,19 @@ type alias Model =
     , key : Key
     , url : Maybe String
     , token : Maybe String
+    , device : Device
+    , currentRoute : Route
     }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        DeviceClassified device ->
+            ( { model | device = device }
+            , Cmd.none
+            )
+
         GetNextPage ->
             case model.response of
                 (RemoteData.Success successResponse) :: rest ->
@@ -195,40 +204,54 @@ babyview model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "Elm Shopify Storefront"
-    , body =
-        [ babyview model ]
-    }
+    case model.currentRoute of
+        NotFoundRoute ->
+            { title = "Not Found"
+            , body =
+                [ babyview model ]
+            }
+
+        HomeRoute ->
+            { title = "Elm Shopify Storefront"
+            , body =
+                [ babyview model ]
+            }
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    onResize <|
+        \width height ->
+            DeviceClassified (Element.classifyDevice { width = width, height = height })
 
 
-init : Decode.Value -> Url -> Key -> ( Model, Cmd Msg )
-init val location key =
+init : Flags -> Url -> Key -> ( Model, Cmd Msg )
+init flags location key =
+    let
+        x =
+            flags.width
+
+        y =
+            flags.height
+
+        apiUrl =
+            flags.apiUrl
+
+        token =
+            flags.token
+
+        currentRoute =
+            location |> fromUrlToRoute
+    in
     setRoute
         (fromLocation location)
         { response = [ RemoteData.Loading ]
         , key = key
-        , url = decodeUrlFromJson val
-        , token = decodeUrlFromJson val
+        , url = Just apiUrl
+        , token = Just token
+        , device = Element.classifyDevice { width = x, height = y }
+        , currentRoute = currentRoute
         }
-
-
-decodeUrlFromJson : Decode.Value -> Maybe String
-decodeUrlFromJson json =
-    json
-        |> Decode.decodeValue (Decode.field "url" Decode.string)
-        |> Result.toMaybe
-
-
-decodeKeyFromJson : Decode.Value -> Maybe String
-decodeKeyFromJson json =
-    json
-        |> Decode.decodeValue (Decode.field "token" Decode.string)
-        |> Result.toMaybe
 
 
 setRoute : Maybe Route -> Model -> ( Model, Cmd Msg )
@@ -245,7 +268,11 @@ setRoute maybeRoute model =
 
 
 type alias Flags =
-    ()
+    { width : Int
+    , height : Int
+    , apiUrl : String
+    , token : String
+    }
 
 
 type Route
@@ -256,7 +283,8 @@ type Route
 routeParser : UrlParser.Parser (Route -> a) a
 routeParser =
     UrlParser.oneOf
-        [ UrlParser.map HomeRoute (UrlParser.s "home") ]
+        [ UrlParser.map HomeRoute top
+        ]
 
 
 fromLocation : Url -> Maybe Route
@@ -282,3 +310,13 @@ routeToString page =
 
         NotFoundRoute ->
             absolute [ "home" ] []
+
+
+fromUrlToRoute : Url.Url -> Route
+fromUrlToRoute url =
+    case parse routeParser url of
+        Nothing ->
+            NotFoundRoute
+
+        Just r ->
+            r

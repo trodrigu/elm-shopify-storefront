@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Shopify Storefront</title>
-    <script src="/elm.js"></script>
-    <script src="/env.js"></script>
+    <script src="_build/elm.js"></script>
+    <script src="_build/env.js"></script>
 </head>
 
 <body id="page-body">
@@ -13,7 +13,12 @@
     <script>
         var app = Elm.Main.init({
             node: document.getElementById("elm"),
-            flags: { apiUrl: env.API_URL, token: env.TOKEN }
+            flags: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                apiUrl: env.API_URL,
+                token: env.TOKEN
+            }
         });
     </script>
 </body>
