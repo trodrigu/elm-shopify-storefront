@@ -3,10 +3,13 @@ module Main exposing (main)
 import Browser exposing (Document, UrlRequest)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Device, Element, alignRight, centerY, el, fill, padding, rgb255, row, spacing, text, width)
+import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerY, el, fill, layout, link, padding, px, rgb, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events
 import Element.Font as Font
+import Element.Input exposing (labelHidden, placeholder, search)
+import FeatherIcons exposing (Icon)
 import Graphql.Document as Document
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
@@ -115,6 +118,7 @@ type Msg
     | ClickedLink UrlRequest
     | ChangedUrl Url
     | DeviceClassified Device
+    | Search String
 
 
 main : Program Flags Model Msg
@@ -142,6 +146,9 @@ type alias Model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Search queryText ->
+            ( model, Cmd.none )
+
         DeviceClassified device ->
             ( { model | device = device }
             , Cmd.none
@@ -202,6 +209,46 @@ babyview model =
         ]
 
 
+portraitTabletBabyview : Model -> Html.Html Msg
+portraitTabletBabyview model =
+    layout []
+        Element.none
+
+
+landscapeTablet : Model -> Html.Html Msg
+landscapeTablet model =
+    layout []
+        (row
+            [ Element.spacing 25 ]
+            [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
+            , link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
+            , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width fill ]
+                { onChange = Search
+                , text = ""
+                , placeholder = Just (placeholder [ Font.color grey ] (Element.text "Search shopname!"))
+                , label = labelHidden "Search"
+                }
+            ]
+        )
+
+
+navItem : String -> Icon -> Element Msg
+navItem label icon =
+    row [] [ icon |> FeatherIcons.toHtml [] |> Element.html, el [ Element.moveDown 2 ] (Element.text label) ]
+
+
+landscapeDesktop : Model -> Html.Html Msg
+landscapeDesktop model =
+    layout []
+        (row
+            []
+            [ link [] { label = Element.text "Home", url = "/" }
+            , link [] { label = Element.text "Shop", url = "/" }
+            , link [] { label = Element.text "Featured", url = "/" }
+            ]
+        )
+
+
 view : Model -> Browser.Document Msg
 view model =
     case model.currentRoute of
@@ -212,10 +259,58 @@ view model =
             }
 
         HomeRoute ->
-            { title = "Elm Shopify Storefront"
-            , body =
-                [ babyview model ]
-            }
+            case model.device.orientation of
+                Portrait ->
+                    case model.device.class of
+                        Phone ->
+                            { title = "Elm Shopify Storefront Phone"
+                            , body =
+                                [ babyview model ]
+                            }
+
+                        Tablet ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitTabletBabyview model ]
+                            }
+
+                        Desktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ babyview model ]
+                            }
+
+                        BigDesktop ->
+                            { title = "Elm Shopify Storefront BigDesktop"
+                            , body =
+                                [ babyview model ]
+                            }
+
+                Landscape ->
+                    case model.device.class of
+                        Phone ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ babyview model ]
+                            }
+
+                        Tablet ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ landscapeTablet model ]
+                            }
+
+                        Desktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ landscapeDesktop model ]
+                            }
+
+                        BigDesktop ->
+                            { title = "Elm Shopify Storefront Big"
+                            , body =
+                                [ babyview model ]
+                            }
 
 
 subscriptions : Model -> Sub Msg
@@ -320,3 +415,18 @@ fromUrlToRoute url =
 
         Just r ->
             r
+
+
+grey : Color
+grey =
+    rgb255 138 138 138
+
+
+lightGrey : Color
+lightGrey =
+    rgb255 240 240 240
+
+
+white : Color
+white =
+    rgb255 255 255 255
