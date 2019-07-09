@@ -8,14 +8,14 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Events
 import Element.Font as Font
-import Element.Input exposing (labelHidden, placeholder, search)
+import Element.Input exposing (button, labelHidden, placeholder, search)
 import FeatherIcons exposing (Icon)
 import Graphql.Document as Document
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument as OptionalArgument exposing (OptionalArgument(..))
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet, with)
-import Html exposing (Html, button, div, h1, p, pre, text)
+import Html exposing (Html, div, h1, p, pre, text)
 import Html.Attributes exposing (style)
 import Html.Events exposing (onClick)
 import Http
@@ -119,6 +119,7 @@ type Msg
     | ChangedUrl Url
     | DeviceClassified Device
     | Search String
+    | Join
 
 
 main : Program Flags Model Msg
@@ -146,6 +147,9 @@ type alias Model =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        Join ->
+            ( model, Cmd.none )
+
         Search queryText ->
             ( model, Cmd.none )
 
@@ -201,7 +205,7 @@ babyview model =
             [ h1 [] [ text "Generated Query" ]
             , pre [] [ text (Document.serializeQuery query) ]
             ]
-        , div [] [ button [ onClick GetNextPage ] [ text "Load next page..." ] ]
+        , div [] [ Html.button [ onClick GetNextPage ] [ text "Load next page..." ] ]
         , div []
             [ h1 [] [ text "Response" ]
             , PrintAny.view model
@@ -231,8 +235,8 @@ landscapeTablet model =
             , el
                 [ Element.alignRight ]
                 (row []
-                    [ link [ Font.color grey, Element.paddingXY 0 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
-                    , link [ Font.color grey, Element.paddingXY 10 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), url = "/" }
+                    [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+                    , el [paddingEach { top = 0, right = 25, bottom = 0, left = 0}] (button [ Border.rounded 18, Background.color grey, Font.color white,Element.paddingXY 25 8  ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
                     ]
                 )
             ]
