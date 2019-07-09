@@ -213,34 +213,48 @@ babyview model =
         ]
 
 
-portraitTabletBabyview : Model -> Html.Html Msg
-portraitTabletBabyview model =
-    layout []
-        Element.none
+navbarLarge : Element Msg
+navbarLarge =
+    row
+        [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
+        [ link [ Font.color grey, Element.moveRight 240, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
+        , link [ Font.color grey, Element.paddingEach { top = 25, right = 25, bottom = 25, left = 240 } ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
+        , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 450) ]
+            { onChange = Search
+            , text = ""
+            , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
+            , label = labelHidden "Search"
+            }
+        , el
+            [ Element.alignRight ]
+            (row []
+                [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+                , el [ paddingEach { top = 0, right = 240, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
+                ]
+            )
+        ]
 
 
-landscapeTablet : Model -> Html.Html Msg
-landscapeTablet model =
-    layout [ Element.width fill ]
-        (row
-            [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
-            [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
-            , link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
-            , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
-                { onChange = Search
-                , text = ""
-                , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
-                , label = labelHidden "Search"
-                }
-            , el
-                [ Element.alignRight ]
-                (row []
-                    [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
-                    , el [paddingEach { top = 0, right = 25, bottom = 0, left = 0}] (button [ Border.rounded 18, Background.color grey, Font.color white,Element.paddingXY 25 8  ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
-                    ]
-                )
-            ]
-        )
+navbarSmall : Element Msg
+navbarSmall =
+    row
+        [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
+        [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
+        , link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
+        , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
+            { onChange = Search
+            , text = ""
+            , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
+            , label = labelHidden "Search"
+            }
+        , el
+            [ Element.alignRight ]
+            (row []
+                [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+                , el [ paddingEach { top = 0, right = 25, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
+                ]
+            )
+        ]
 
 
 searchTextWithIcon : Element Msg
@@ -256,14 +270,74 @@ navItem label icon =
     row [] [ icon |> FeatherIcons.toHtml [] |> Element.html, el [ Element.moveRight 2, Element.moveDown 2 ] (Element.text label) ]
 
 
+portraitPhone : Model -> Html.Html Msg
+portraitPhone model =
+    layout []
+        (row [ Element.width fill ]
+            [ navbarSmall
+            ]
+        )
+
+
+portraitTablet : Model -> Html.Html Msg
+portraitTablet model =
+    layout []
+        (row [ Element.width fill ]
+            [ navbarSmall
+            ]
+        )
+
+
+portraitDesktop : Model -> Html.Html Msg
+portraitDesktop model =
+    layout []
+        (row [ Element.width fill ]
+            [ navbarLarge
+            ]
+        )
+
+
+portraitBigDesktop : Model -> Html.Html Msg
+portraitBigDesktop model =
+    layout []
+        (row [ Element.width fill ]
+            [ navbarLarge
+            ]
+        )
+
+
+landscapePhone : Model -> Html.Html Msg
+landscapePhone model =
+    layout [ Element.width fill ]
+        (row [ Element.width fill ]
+            [ navbarSmall
+            ]
+        )
+
+
+landscapeTablet : Model -> Html.Html Msg
+landscapeTablet model =
+    layout [ Element.width fill ]
+        (row [ Element.width fill ]
+            [ navbarSmall
+            ]
+        )
+
+
 landscapeDesktop : Model -> Html.Html Msg
 landscapeDesktop model =
     layout []
-        (row
-            []
-            [ link [] { label = Element.text "Home", url = "/" }
-            , link [] { label = Element.text "Shop", url = "/" }
-            , link [] { label = Element.text "Featured", url = "/" }
+        (row [ Element.width fill ]
+            [ navbarLarge
+            ]
+        )
+
+
+landscapeBigDesktop : Model -> Html.Html Msg
+landscapeBigDesktop model =
+    layout []
+        (row [ Element.width fill ]
+            [ navbarLarge
             ]
         )
 
@@ -284,25 +358,25 @@ view model =
                         Phone ->
                             { title = "Elm Shopify Storefront Phone"
                             , body =
-                                [ babyview model ]
+                                [ portraitPhone model ]
                             }
 
                         Tablet ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ portraitTabletBabyview model ]
+                                [ portraitTablet model ]
                             }
 
                         Desktop ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ babyview model ]
+                                [ portraitDesktop model ]
                             }
 
                         BigDesktop ->
-                            { title = "Elm Shopify Storefront BigDesktop"
+                            { title = "Elm Shopify Storefront"
                             , body =
-                                [ babyview model ]
+                                [ portraitBigDesktop model ]
                             }
 
                 Landscape ->
@@ -310,7 +384,7 @@ view model =
                         Phone ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ babyview model ]
+                                [ landscapePhone model ]
                             }
 
                         Tablet ->
@@ -326,9 +400,9 @@ view model =
                             }
 
                         BigDesktop ->
-                            { title = "Elm Shopify Storefront Big"
+                            { title = "Elm Shopify Storefront"
                             , body =
-                                [ babyview model ]
+                                [ landscapeBigDesktop model ]
                             }
 
 
