@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document, UrlRequest)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerY, el, fill, layout, link, padding, px, rgb, rgb255, row, spacing, text, width)
+import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerY, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events
@@ -217,24 +217,39 @@ portraitTabletBabyview model =
 
 landscapeTablet : Model -> Html.Html Msg
 landscapeTablet model =
-    layout []
+    layout [ Element.width fill ]
         (row
-            [ Element.spacing 25 ]
+            [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
             [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
             , link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
-            , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width fill ]
+            , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
                 { onChange = Search
                 , text = ""
-                , placeholder = Just (placeholder [ Font.color grey ] (Element.text "Search shopname!"))
+                , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
                 , label = labelHidden "Search"
                 }
+            , el
+                [ Element.alignRight ]
+                (row []
+                    [ link [ Font.color grey, Element.paddingXY 0 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+                    , link [ Font.color grey, Element.paddingXY 10 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), url = "/" }
+                    ]
+                )
             ]
         )
 
 
+searchTextWithIcon : Element Msg
+searchTextWithIcon =
+    row []
+        [ FeatherIcons.search |> FeatherIcons.toHtml [] |> Element.html
+        , el [ Element.moveRight 2 ] (Element.text "Search shop")
+        ]
+
+
 navItem : String -> Icon -> Element Msg
 navItem label icon =
-    row [] [ icon |> FeatherIcons.toHtml [] |> Element.html, el [ Element.moveDown 2 ] (Element.text label) ]
+    row [] [ icon |> FeatherIcons.toHtml [] |> Element.html, el [ Element.moveRight 2, Element.moveDown 2 ] (Element.text label) ]
 
 
 landscapeDesktop : Model -> Html.Html Msg
