@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document, UrlRequest)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerY, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spacing, text, width)
+import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events
@@ -29,6 +29,9 @@ import ShopifyApi.Object.CollectionEdge as CollectionEdge
 import ShopifyApi.Object.PageInfo as PageInfo
 import ShopifyApi.Query as Query
 import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id)
+import Svg exposing (path, style)
+import Svg.Attributes exposing (cx, cy, d, r, transform, version, x1, x2, y1, y2)
+import Tent as Tent exposing (tent)
 import Url exposing (Url)
 import Url.Builder as UrlBuilder exposing (absolute)
 import Url.Parser as UrlParser exposing (..)
@@ -239,21 +242,29 @@ navbarSmall : Element Msg
 navbarSmall =
     row
         [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
-        [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
-        , link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
-        , search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
-            { onChange = Search
-            , text = ""
-            , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
-            , label = labelHidden "Search"
-            }
-        , el
-            [ Element.alignRight ]
-            (row []
-                [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
-                , el [ paddingEach { top = 0, right = 25, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
-                ]
-            )
+        [ column []
+            [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
+            ]
+        , column []
+            [ link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
+            ]
+        , column []
+            [ search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
+                { onChange = Search
+                , text = ""
+                , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
+                , label = labelHidden "Search"
+                }
+            ]
+        , column [ Element.alignRight ]
+            [ el
+                []
+                (row []
+                    [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+                    , el [ paddingEach { top = 0, right = 25, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
+                    ]
+                )
+            ]
         ]
 
 
@@ -282,10 +293,23 @@ portraitPhone model =
 portraitTablet : Model -> Html.Html Msg
 portraitTablet model =
     layout []
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarSmall
+            , hero
             ]
         )
+
+
+hero : Element Msg
+hero =
+    row [ Element.width fill, Element.height (px 500) ]
+        [ Element.el [ centerX, centerY ] tentHere ]
+
+
+tentHere : Element Msg
+tentHere =
+    tent
+        |> Element.html
 
 
 portraitDesktop : Model -> Html.Html Msg
@@ -358,25 +382,33 @@ view model =
                         Phone ->
                             { title = "Elm Shopify Storefront Phone"
                             , body =
-                                [ portraitPhone model ]
+                                [ portraitPhone model
+                                , babyview model
+                                ]
                             }
 
                         Tablet ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ portraitTablet model ]
+                                [ portraitTablet model
+                                , babyview model
+                                ]
                             }
 
                         Desktop ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ portraitDesktop model ]
+                                [ portraitDesktop model
+                                , babyview model
+                                ]
                             }
 
                         BigDesktop ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ portraitBigDesktop model ]
+                                [ portraitBigDesktop model
+                                , babyview model
+                                ]
                             }
 
                 Landscape ->
@@ -384,25 +416,33 @@ view model =
                         Phone ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ landscapePhone model ]
+                                [ landscapePhone model
+                                , babyview model
+                                ]
                             }
 
                         Tablet ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ landscapeTablet model ]
+                                [ landscapeTablet model
+                                , babyview model
+                                ]
                             }
 
                         Desktop ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ landscapeDesktop model ]
+                                [ landscapeDesktop model
+                                , babyview model
+                                ]
                             }
 
                         BigDesktop ->
                             { title = "Elm Shopify Storefront"
                             , body =
-                                [ landscapeBigDesktop model ]
+                                [ landscapeBigDesktop model
+                                , babyview model
+                                ]
                             }
 
 
