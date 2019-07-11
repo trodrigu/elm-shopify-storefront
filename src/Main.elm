@@ -26,9 +26,15 @@ import ShopifyApi.Object
 import ShopifyApi.Object.Collection as Collection
 import ShopifyApi.Object.CollectionConnection as CollectionConnection
 import ShopifyApi.Object.CollectionEdge as CollectionEdge
+import ShopifyApi.Object.Image as Image
+import ShopifyApi.Object.ImageConnection as ImageConnection
+import ShopifyApi.Object.ImageEdge as ImageEdge
 import ShopifyApi.Object.PageInfo as PageInfo
+import ShopifyApi.Object.Product as Product
+import ShopifyApi.Object.ProductConnection as ProductConnection
+import ShopifyApi.Object.ProductEdge as ProductEdge
 import ShopifyApi.Query as Query
-import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id)
+import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id, Url)
 import Svg exposing (path, style)
 import Svg.Attributes exposing (cx, cy, d, r, transform, version, x1, x2, y1, y2)
 import Tent as Tent exposing (tent)
@@ -38,57 +44,39 @@ import Url.Parser as UrlParser exposing (..)
 
 
 type alias Response =
-    Paginator (List Collection)
+    Maybe Collection
 
 
-type alias Paginator dataType =
-    { data : dataType
-    , paginationData : PaginationData
-    }
-
-
-type alias PaginationData =
-    { hasNextPage : Bool
-    , hasPreviousPage : Bool
-    }
-
-
-collectionSearchSelection : SelectionSet Response ShopifyApi.Object.CollectionConnection
-collectionSearchSelection =
-    SelectionSet.succeed Paginator
-        |> with searchResultFieldEdges
-        |> with (CollectionConnection.pageInfo searchPageInfoSelection)
-
-
-searchPageInfoSelection : SelectionSet PaginationData ShopifyApi.Object.PageInfo
-searchPageInfoSelection =
-    SelectionSet.succeed PaginationData
-        |> with PageInfo.hasNextPage
-        |> with PageInfo.hasPreviousPage
-
-
-searchResultFieldEdges : SelectionSet (List Collection) ShopifyApi.Object.CollectionConnection
-searchResultFieldEdges =
-    CollectionConnection.edges
-        (CollectionEdge.node collectionSelection)
+collectionByHandleQuery : SelectionSet (Maybe Collection) RootQuery
+collectionByHandleQuery =
+    Query.collectionByHandle
+        { handle = "frontpage"
+        }
+        collectionSelection
 
 
 collectionSelection : SelectionSet Collection ShopifyApi.Object.Collection
 collectionSelection =
-    SelectionSet.succeed Collection
-        |> with Collection.id
-        |> with Collection.handle
+    SelectionSet.map3 Collection
+        Collection.id
+        Collection.handle
+        (Collection.products (\r -> { r | first = Present 4 }) (ProductConnection.edges (ProductEdge.node productSelection)))
 
 
-query : SelectionSet Response RootQuery
-query =
-    Query.collections
-        (\optionals ->
-            { optionals
-                | first = Present 5
-            }
+productSelection : SelectionSet Product ShopifyApi.Object.Product
+productSelection =
+    SelectionSet.map2 Product
+        Product.handle
+        (Product.images
+            (\r -> { r | first = Present 4 })
+            (ImageConnection.edges (ImageEdge.node imageSelection))
         )
-        collectionSearchSelection
+
+
+imageSelection : SelectionSet Image ShopifyApi.Object.Image
+imageSelection =
+    SelectionSet.map Image
+        Image.src
 
 
 makeRequest : Maybe String -> Maybe String -> Cmd Msg
@@ -97,7 +85,7 @@ makeRequest url token =
         Just innerUrl ->
             case token of
                 Just innerToken ->
-                    query
+                    collectionByHandleQuery
                         |> Graphql.Http.queryRequest innerUrl
                         |> Graphql.Http.withHeader "X-Shopify-Storefront-Access-Token" innerToken
                         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
@@ -112,12 +100,23 @@ makeRequest url token =
 type alias Collection =
     { id : Id
     , handle : String
+    , products : List Product
+    }
+
+
+type alias Product =
+    { handle : String
+    , images : List Image
+    }
+
+
+type alias Image =
+    { src : ScalarCodecs.Url
     }
 
 
 type Msg
     = GotResponse RemoteDataResponse
-    | GetNextPage
     | ClickedLink UrlRequest
     | ChangedUrl Url
     | DeviceClassified Device
@@ -161,18 +160,6 @@ update msg model =
             , Cmd.none
             )
 
-        GetNextPage ->
-            case model.response of
-                (RemoteData.Success successResponse) :: rest ->
-                    if successResponse.paginationData.hasNextPage then
-                        ( { model | response = RemoteData.Loading :: model.response }, makeRequest model.url model.token )
-
-                    else
-                        ( model, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
         GotResponse response ->
             case model.response of
                 head :: rest ->
@@ -206,9 +193,8 @@ babyview model =
     div []
         [ div []
             [ h1 [] [ text "Generated Query" ]
-            , pre [] [ text (Document.serializeQuery query) ]
+            , pre [] [ text (Document.serializeQuery collectionByHandleQuery) ]
             ]
-        , div [] [ Html.button [ onClick GetNextPage ] [ text "Load next page..." ] ]
         , div []
             [ h1 [] [ text "Response" ]
             , PrintAny.view model
