@@ -21,7 +21,7 @@ import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import PrintAny
-import RemoteData exposing (RemoteData, WebData)
+import RemoteData exposing (RemoteData(..), WebData)
 import ShopifyApi.Object
 import ShopifyApi.Object.Collection as Collection
 import ShopifyApi.Object.CollectionConnection as CollectionConnection
@@ -34,6 +34,7 @@ import ShopifyApi.Object.Product as Product
 import ShopifyApi.Object.ProductConnection as ProductConnection
 import ShopifyApi.Object.ProductEdge as ProductEdge
 import ShopifyApi.Query as Query
+import ShopifyApi.Scalar as Scalar
 import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id, Url)
 import Svg exposing (path, style)
 import Svg.Attributes exposing (cx, cy, d, r, transform, version, x1, x2, y1, y2)
@@ -65,12 +66,13 @@ collectionSelection =
 
 productSelection : SelectionSet Product ShopifyApi.Object.Product
 productSelection =
-    SelectionSet.map2 Product
+    SelectionSet.map3 Product
         Product.handle
         (Product.images
             (\r -> { r | first = Present 4 })
             (ImageConnection.edges (ImageEdge.node imageSelection))
         )
+        (Product.description (\r -> { r | truncateAt = Absent }))
 
 
 imageSelection : SelectionSet Image ShopifyApi.Object.Image
@@ -107,6 +109,7 @@ type alias Collection =
 type alias Product =
     { handle : String
     , images : List Image
+    , description : String
     }
 
 
@@ -282,8 +285,90 @@ portraitTablet model =
         (column [ Element.width fill ]
             [ navbarSmall
             , hero
+            , frontPageCollection model
             ]
         )
+
+
+frontPageCollection : Model -> Element Msg
+frontPageCollection model =
+    let
+        head =
+            List.head model.response
+    in
+    row [ Element.width fill, Element.height (px 500) ]
+        (case head of
+            Just innerHead ->
+                webDataView innerHead
+
+            Nothing ->
+                noResponseView
+        )
+
+
+noResponseView : List (Element Msg)
+noResponseView =
+    [ Element.text "No Responses yet!" ]
+
+
+webDataView : RemoteDataResponse -> List (Element Msg)
+webDataView response =
+    case response of
+        NotAsked ->
+            [ Element.text "Initialising." ]
+
+        Loading ->
+            [ Element.text "Loading." ]
+
+        Failure err ->
+            [ Element.text ("Error: " ++ Debug.toString err) ]
+
+        Success innerResponse ->
+            viewResponse innerResponse
+
+
+viewResponse : Response -> List (Element Msg)
+viewResponse response =
+    case response of
+        Just collection ->
+            viewCollection collection
+
+        Nothing ->
+            [ Element.text "No collection here!" ]
+
+
+viewCollection : Collection -> List (Element Msg)
+viewCollection collection =
+    viewProducts collection.products
+
+
+viewProducts : List Product -> List (Element Msg)
+viewProducts products =
+    List.map (\p -> viewProduct p) products
+
+
+viewProduct : Product -> Element Msg
+viewProduct product =
+    let
+        head =
+            List.head product.images
+    in
+    Element.column []
+        (List.map (\i -> viewImage (Just i)) product.images)
+
+
+viewImage : Maybe Image -> Element Msg
+viewImage image =
+    case image of
+        Just innerImage ->
+            let
+                (Scalar.Url urlAsString) =
+                    innerImage.src
+            in
+            Element.image [] { description = "", src = urlAsString }
+
+        Nothing ->
+            Element.text "No Image here."
 
 
 hero : Element Msg
