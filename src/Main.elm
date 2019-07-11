@@ -78,7 +78,9 @@ productSelection =
 imageSelection : SelectionSet Image ShopifyApi.Object.Image
 imageSelection =
     SelectionSet.map Image
-        Image.src
+        (Image.transformedSrc
+            (\o -> { o | maxWidth = Present 200 })
+        )
 
 
 makeRequest : Maybe String -> Maybe String -> Cmd Msg
