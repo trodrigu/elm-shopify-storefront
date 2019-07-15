@@ -33,6 +33,10 @@ import ShopifyApi.Object.PageInfo as PageInfo
 import ShopifyApi.Object.Product as Product
 import ShopifyApi.Object.ProductConnection as ProductConnection
 import ShopifyApi.Object.ProductEdge as ProductEdge
+import ShopifyApi.Object.ProductVariant as ProductVariant
+import ShopifyApi.Object.ProductVariantConnection as ProductVariantConnection
+import ShopifyApi.Object.ProductVariantEdge as ProductVariantEdge
+import ShopifyApi.Object.Shop as Shop
 import ShopifyApi.Query as Query
 import ShopifyApi.Scalar as Scalar
 import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id, Url)
@@ -44,35 +48,25 @@ import Url.Builder as UrlBuilder exposing (absolute)
 import Url.Parser as UrlParser exposing (..)
 
 
-type alias Response =
-    Maybe Collection
-
-
-collectionByHandleQuery : SelectionSet (Maybe Collection) RootQuery
-collectionByHandleQuery =
-    Query.collectionByHandle
-        { handle = "frontpage"
-        }
-        collectionSelection
-
-
-collectionSelection : SelectionSet Collection ShopifyApi.Object.Collection
-collectionSelection =
-    SelectionSet.map3 Collection
-        Collection.id
-        Collection.handle
-        (Collection.products (\r -> { r | first = Present 4 }) (ProductConnection.edges (ProductEdge.node productSelection)))
-
-
 productSelection : SelectionSet Product ShopifyApi.Object.Product
 productSelection =
-    SelectionSet.map3 Product
+    SelectionSet.map4 Product
         Product.handle
         (Product.images
             (\r -> { r | first = Present 4 })
             (ImageConnection.edges (ImageEdge.node imageSelection))
         )
         (Product.description (\r -> { r | truncateAt = Absent }))
+        (Product.variants (\r -> { r | first = Present 4 }) variantPaginatorSelectionSet)
+
+
+variantSelection : SelectionSet Variant ShopifyApi.Object.ProductVariant
+variantSelection =
+    SelectionSet.map4 Variant
+        ProductVariant.id
+        ProductVariant.title
+        (ProductVariant.image (\r -> { r | maxWidth = Absent }) imageSelection)
+        ProductVariant.price
 
 
 imageSelection : SelectionSet Image ShopifyApi.Object.Image
@@ -83,13 +77,58 @@ imageSelection =
         )
 
 
+shopQuery : SelectionSet Response RootQuery
+shopQuery =
+    Query.shop
+        shopSelection
+
+
+shopSelection : SelectionSet Response ShopifyApi.Object.Shop
+shopSelection =
+    SelectionSet.map3 Shop
+        Shop.name
+        Shop.description
+        (Shop.products (\r -> { r | first = Present 4 }) productPaginatorSelectionSet)
+
+
+productPaginatorSelectionSet : SelectionSet (Paginator (List Product)) ShopifyApi.Object.ProductConnection
+productPaginatorSelectionSet =
+    SelectionSet.map2 Paginator
+        (ProductConnection.edges productEdge)
+        (ProductConnection.pageInfo pageInfo)
+
+
+variantPaginatorSelectionSet : SelectionSet (Paginator (List Variant)) ShopifyApi.Object.ProductVariantConnection
+variantPaginatorSelectionSet =
+    SelectionSet.map2 Paginator
+        (ProductVariantConnection.edges variantEdge)
+        (ProductVariantConnection.pageInfo pageInfo)
+
+
+variantEdge : SelectionSet Variant ShopifyApi.Object.ProductVariantEdge
+variantEdge =
+    ProductVariantEdge.node variantSelection
+
+
+productEdge : SelectionSet Product ShopifyApi.Object.ProductEdge
+productEdge =
+    ProductEdge.node productSelection
+
+
+pageInfo : SelectionSet PaginationData ShopifyApi.Object.PageInfo
+pageInfo =
+    SelectionSet.succeed PaginationData
+        |> with PageInfo.hasNextPage
+        |> with PageInfo.hasPreviousPage
+
+
 makeRequest : Maybe String -> Maybe String -> Cmd Msg
 makeRequest url token =
     case url of
         Just innerUrl ->
             case token of
                 Just innerToken ->
-                    collectionByHandleQuery
+                    shopQuery
                         |> Graphql.Http.queryRequest innerUrl
                         |> Graphql.Http.withHeader "X-Shopify-Storefront-Access-Token" innerToken
                         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
@@ -99,6 +138,37 @@ makeRequest url token =
 
         Nothing ->
             Cmd.none
+
+
+type alias Response =
+    Shop
+
+
+type alias Paginator dataType =
+    { data : dataType
+    , paginationData : PaginationData
+    }
+
+
+type alias PaginationData =
+    { hasNextPage : Bool
+    , hasPreviousPage : Bool
+    }
+
+
+type alias Shop =
+    { name : String
+    , description : Maybe String
+    , products : Paginator (List Product)
+    }
+
+
+type alias Flags =
+    { width : Int
+    , height : Int
+    , apiUrl : String
+    , token : String
+    }
 
 
 type alias Collection =
@@ -112,6 +182,15 @@ type alias Product =
     { handle : String
     , images : List Image
     , description : String
+    , variants : Paginator (List Variant)
+    }
+
+
+type alias Variant =
+    { id : Id
+    , title : String
+    , image : Maybe Image
+    , price : ScalarCodecs.Money
     }
 
 
@@ -197,10 +276,6 @@ babyview : Model -> Html.Html Msg
 babyview model =
     div []
         [ div []
-            [ h1 [] [ text "Generated Query" ]
-            , pre [] [ text (Document.serializeQuery collectionByHandleQuery) ]
-            ]
-        , div []
             [ h1 [] [ text "Response" ]
             , PrintAny.view model
             ]
@@ -331,22 +406,17 @@ webDataView response =
 
 viewResponse : Response -> List (Element Msg)
 viewResponse response =
-    case response of
-        Just collection ->
-            viewCollection collection
-
-        Nothing ->
-            [ Element.text "No collection here!" ]
+    viewShop response
 
 
-viewCollection : Collection -> List (Element Msg)
-viewCollection collection =
-    viewProducts collection.products
+viewShop : Shop -> List (Element Msg)
+viewShop shop =
+    viewProducts shop.products
 
 
-viewProducts : List Product -> List (Element Msg)
-viewProducts products =
-    List.map (\p -> viewProduct p) products
+viewProducts : Paginator (List Product) -> List (Element Msg)
+viewProducts paginator =
+    List.map (\p -> viewProduct p) paginator.data
 
 
 viewProduct : Product -> Element Msg
@@ -566,14 +636,6 @@ setRoute maybeRoute model =
 
         Nothing ->
             ( model, modifyUrl model.key HomeRoute )
-
-
-type alias Flags =
-    { width : Int
-    , height : Int
-    , apiUrl : String
-    , token : String
-    }
 
 
 type Route
