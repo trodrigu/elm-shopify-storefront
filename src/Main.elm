@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document, UrlRequest)
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spacing, text, width)
+import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spaceEvenly, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events
@@ -53,7 +53,7 @@ productSelection =
     SelectionSet.map4 Product
         Product.handle
         (Product.images
-            (\r -> { r | first = Present 4 })
+            (\r -> { r | first = Present 1 })
             (ImageConnection.edges (ImageEdge.node imageSelection))
         )
         (Product.description (\r -> { r | truncateAt = Absent }))
@@ -73,7 +73,7 @@ imageSelection : SelectionSet Image ShopifyApi.Object.Image
 imageSelection =
     SelectionSet.map Image
         (Image.transformedSrc
-            (\o -> { o | maxWidth = Present 200 })
+            (\o -> { o | maxWidth = Present 240 })
         )
 
 
@@ -373,7 +373,7 @@ frontPageCollection model =
         head =
             List.head model.response
     in
-    row [ Element.width fill, Element.height (px 500) ]
+    wrappedRow [ spacing 20, centerX, padding 20, Element.width fill, Element.htmlAttribute (Html.Attributes.style "justify-content" "center") ]
         (case head of
             Just innerHead ->
                 webDataView innerHead
@@ -425,8 +425,8 @@ viewProduct product =
         head =
             List.head product.images
     in
-    Element.column []
-        (List.map (\i -> viewImage (Just i)) product.images)
+    Element.el []
+        (viewImage head)
 
 
 viewImage : Maybe Image -> Element Msg
@@ -437,7 +437,8 @@ viewImage image =
                 (Scalar.Url urlAsString) =
                     innerImage.src
             in
-            Element.image [] { description = "", src = urlAsString }
+            Element.el []
+                (Element.image [] { description = "", src = urlAsString })
 
         Nothing ->
             Element.text "No Image here."
@@ -445,7 +446,7 @@ viewImage image =
 
 hero : Element Msg
 hero =
-    row [ Element.width fill, Element.height (px 500) ]
+    row [ Element.width fill, Element.height (px 350) ]
         [ Element.el [ centerX, centerY ] tentHere ]
 
 
