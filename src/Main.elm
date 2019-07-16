@@ -477,8 +477,10 @@ portraitBigDesktop model =
 landscapePhone : Model -> Html.Html Msg
 landscapePhone model =
     layout [ Element.width fill ]
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarSmall
+            , hero
+            , frontPageCollection model
             ]
         )
 
@@ -486,8 +488,10 @@ landscapePhone model =
 landscapeTablet : Model -> Html.Html Msg
 landscapeTablet model =
     layout [ Element.width fill ]
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarSmall
+            , hero
+            , frontPageCollection model
             ]
         )
 
@@ -495,8 +499,10 @@ landscapeTablet model =
 landscapeDesktop : Model -> Html.Html Msg
 landscapeDesktop model =
     layout []
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarLarge
+            , hero
+            , frontPageCollection model
             ]
         )
 
@@ -504,8 +510,10 @@ landscapeDesktop model =
 landscapeBigDesktop : Model -> Html.Html Msg
 landscapeBigDesktop model =
     layout []
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarLarge
+            , hero
+            , frontPageCollection model
             ]
         )
 
