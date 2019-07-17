@@ -437,7 +437,7 @@ viewImage image =
                 (Scalar.Url urlAsString) =
                     innerImage.src
             in
-            Element.el []
+            Element.el [ Element.clip, Border.rounded 30, Background.image urlAsString ]
                 (Element.image [] { description = "", src = urlAsString })
 
         Nothing ->
