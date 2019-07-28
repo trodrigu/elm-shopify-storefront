@@ -289,7 +289,7 @@ update msg model =
             )
 
         UpdateOption option ->
-            case Debug.log "o" option of
+            case option of
                 [ f, s ] ->
                     let
                         findZipper l =
@@ -473,7 +473,7 @@ portraitPhoneProductDetail model =
     layout []
         (column [ Element.width fill ]
             [ navbarSmall
-            , viewProduct product model
+            , viewProductOnDetail product model
             ]
         )
 
@@ -567,6 +567,47 @@ viewProduct product m =
                 }
             ]
         )
+
+
+viewProductOnDetail : Product -> Model -> Element Msg
+viewProductOnDetail product m =
+    let
+        variants =
+            m.productsAndFocusedVariant
+                |> Dict.get (product.id |> getId)
+                |> Maybe.withDefault (SelectList.fromLists [] defaultVariant [])
+
+        head =
+            List.head product.images
+    in
+    Element.el []
+        (column []
+            ([ viewImage head
+             , Element.link [ padding 25 ]
+                { url =
+                    routeToString (ProductDetailRoute (product.id |> getId))
+                , label = Element.text product.title
+                }
+             ]
+                ++ viewVariants variants
+            )
+        )
+
+
+viewVariants : SelectList.SelectList Variant -> List (Element Msg)
+viewVariants variants =
+    List.map (viewVariant variants) (variants |> SelectList.toList)
+
+
+viewVariant : SelectList.SelectList Variant -> Variant -> Element Msg
+viewVariant variants variant =
+    if variant == SelectList.selected variants then
+        Element.el [ Border.solid, Border.width 3, Element.padding 10 ]
+            (Element.text variant.title)
+
+    else
+        Element.el [ Element.padding 10 ]
+            (Element.text variant.title)
 
 
 viewImage : Maybe Image -> Element Msg
