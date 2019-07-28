@@ -21,12 +21,12 @@
             "mdgriffith/elm-ui": "1.1.0"
         },
         "indirect": {
+            "elm-community/list-extra": "8.2.0",
             "Skinney/murmur3": "2.0.8",
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
             "elm/regex": "1.0.0",
             "elm/virtual-dom": "1.0.2",
-            "elm-community/list-extra": "8.2.0",
             "lukewestby/elm-string-interpolate": "1.0.3"
         }
     },

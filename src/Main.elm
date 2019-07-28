@@ -1,14 +1,16 @@
 module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest)
+import Browser.Dom
 import Browser.Events exposing (onResize)
 import Browser.Navigation as Navigation exposing (Key)
-import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spaceEvenly, spacing, text, width, wrappedRow)
+import Dict exposing (Dict)
+import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, below, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spaceEvenly, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Events
 import Element.Font as Font
-import Element.Input exposing (button, labelHidden, placeholder, search)
+import Element.Input as Input exposing (Option, button, labelHidden, placeholder, search)
 import FeatherIcons exposing (Icon)
 import Graphql.Document as Document
 import Graphql.Http
@@ -22,6 +24,7 @@ import Http
 import Json.Decode as Decode
 import PrintAny
 import RemoteData exposing (RemoteData(..), WebData)
+import SelectList as SelectList
 import ShopifyApi.Object
 import ShopifyApi.Object.Collection as Collection
 import ShopifyApi.Object.CollectionConnection as CollectionConnection
@@ -42,6 +45,7 @@ import ShopifyApi.Scalar as Scalar
 import ShopifyApi.ScalarCodecs as ScalarCodecs exposing (Id, Url)
 import Svg exposing (path, style)
 import Svg.Attributes exposing (cx, cy, d, r, transform, version, x1, x2, y1, y2)
+import Task
 import Tent as Tent exposing (tent)
 import Url exposing (Url)
 import Url.Builder as UrlBuilder exposing (absolute)
@@ -50,7 +54,8 @@ import Url.Parser as UrlParser exposing (..)
 
 productSelection : SelectionSet Product ShopifyApi.Object.Product
 productSelection =
-    SelectionSet.map4 Product
+    SelectionSet.map6 Product
+        Product.id
         Product.handle
         (Product.images
             (\r -> { r | first = Present 1 })
@@ -58,6 +63,7 @@ productSelection =
         )
         (Product.description (\r -> { r | truncateAt = Absent }))
         (Product.variants (\r -> { r | first = Present 4 }) variantPaginatorSelectionSet)
+        Product.title
 
 
 variantSelection : SelectionSet Variant ShopifyApi.Object.ProductVariant
@@ -150,6 +156,10 @@ type alias Paginator dataType =
     }
 
 
+defaultPaginationData =
+    { hasNextPage = False, hasPreviousPage = False }
+
+
 type alias PaginationData =
     { hasNextPage : Bool
     , hasPreviousPage : Bool
@@ -179,11 +189,26 @@ type alias Collection =
 
 
 type alias Product =
-    { handle : String
+    { id : Scalar.Id
+    , handle : String
     , images : List Image
     , description : String
     , variants : Paginator (List Variant)
+    , title : String
     }
+
+
+defaultImage : Image
+defaultImage =
+    { src = Scalar.Url "" }
+
+
+defaultProduct =
+    { id = Scalar.Id "", handle = "", images = [ defaultImage ], description = "", variants = { data = [ defaultVariant ], paginationData = defaultPaginationData }, title = "" }
+
+
+defaultVariant =
+    { id = Scalar.Id "", title = "asdf", image = Nothing, price = Scalar.Money "" }
 
 
 type alias Variant =
@@ -206,6 +231,11 @@ type Msg
     | DeviceClassified Device
     | Search String
     | Join
+    | Focus String
+    | LoseFocus String
+    | UpdateFocus Bool
+    | UpdateOption (List String)
+    | NoOp
 
 
 main : Program Flags Model Msg
@@ -227,12 +257,60 @@ type alias Model =
     , token : Maybe String
     , device : Device
     , currentRoute : Route
+    , menuFocused : Bool
+    , productsAndFocusedVariant : Dict String (SelectList.SelectList Variant)
+    , focusedProducts : SelectList.SelectList Product
+    , page : Page
     }
+
+
+type Page
+    = Home
+    | ProductDetail
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        NoOp ->
+            ( model, Cmd.none )
+
+        UpdateFocus focused ->
+            ( { model | menuFocused = focused }, Cmd.none )
+
+        Focus id ->
+            ( { model | menuFocused = True }
+            , Task.attempt (always NoOp) (Browser.Dom.focus id)
+            )
+
+        LoseFocus id ->
+            ( { model | menuFocused = False }
+            , Task.attempt (always NoOp) (Browser.Dom.blur id)
+            )
+
+        UpdateOption option ->
+            case Debug.log "o" option of
+                [ f, s ] ->
+                    let
+                        findZipper l =
+                            Dict.get l model.productsAndFocusedVariant
+
+                        foundZipper =
+                            Maybe.withDefault (SelectList.fromLists [] defaultVariant []) (findZipper f)
+
+                        updatedKV =
+                            SelectList.select (\el -> el.id == Scalar.Id s) foundZipper
+
+                        updatedProductsAndFocusedVariant =
+                            Dict.insert f updatedKV model.productsAndFocusedVariant
+                    in
+                    ( { model | productsAndFocusedVariant = updatedProductsAndFocusedVariant }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
         Join ->
             ( model, Cmd.none )
 
@@ -247,7 +325,49 @@ update msg model =
         GotResponse response ->
             case model.response of
                 head :: rest ->
-                    ( { model | response = response :: rest }, Cmd.none )
+                    case response of
+                        RemoteData.Success shop ->
+                            let
+                                ph =
+                                    shop.products.data
+                                        |> List.head
+                                        |> Maybe.withDefault defaultProduct
+
+                                prest =
+                                    shop.products.data
+                                        |> List.tail
+                                        |> Maybe.withDefault [ defaultProduct ]
+
+                                updatedProductZipper =
+                                    SelectList.fromLists [] ph prest
+
+                                tupilize ps =
+                                    List.map
+                                        (\p ->
+                                            let
+                                                vh =
+                                                    p.variants.data
+                                                        |> List.head
+                                                        |> Maybe.withDefault defaultVariant
+
+                                                vrest =
+                                                    p.variants.data
+                                                        |> List.tail
+                                                        |> Maybe.withDefault [ defaultVariant ]
+                                            in
+                                            ( getId p.id, vrest |> SelectList.fromLists [] vh )
+                                        )
+                                        ps
+
+                                updatedVariantDict =
+                                    shop.products.data
+                                        |> tupilize
+                                        |> Dict.fromList
+                            in
+                            ( { model | response = response :: rest, focusedProducts = updatedProductZipper, productsAndFocusedVariant = updatedVariantDict }, Cmd.none )
+
+                        _ ->
+                            ( model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -308,29 +428,25 @@ navbarSmall : Element Msg
 navbarSmall =
     row
         [ Element.width fill, Element.spacing 25, Border.solid, Border.shadow { offset = ( 1, 1 ), size = 1, blur = 1, color = lightGrey }, Border.widthXY 0 1, Border.color lightGrey ]
-        [ column []
-            [ link [ Font.color grey, Element.moveRight 20, Element.paddingXY 0 25 ] { label = navItem "Home" FeatherIcons.home, url = "/" }
-            ]
-        , column []
-            [ link [ Font.color grey, Element.paddingXY 10 25 ] { label = navItem "Shop" FeatherIcons.gift, url = "/" }
-            ]
-        , column []
-            [ search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 250) ]
+        [ Element.el [ padding 35 ] tinyTentHere
+        , column [ padding 25 ]
+            [ search [ Border.rounded 15, Border.color white, Background.color lightGrey, width (px 300) ]
                 { onChange = Search
                 , text = ""
                 , placeholder = Just (placeholder [ Font.color grey ] searchTextWithIcon)
                 , label = labelHidden "Search"
                 }
             ]
-        , column [ Element.alignRight ]
-            [ el
-                []
-                (row []
-                    [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
-                    , el [ paddingEach { top = 0, right = 25, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
-                    ]
-                )
-            ]
+
+        -- , column [ Element.alignRight ]
+        --     [ el
+        --         []
+        --         (row []
+        --             [ link [ Font.color grey, Element.paddingXY 25 25 ] { label = el [ Element.moveDown 2 ] (Element.text "Login"), url = "/" }
+        --             , el [ paddingEach { top = 0, right = 25, bottom = 0, left = 0 } ] (button [ Border.rounded 18, Background.color grey, Font.color white, Element.paddingXY 25 8 ] { label = el [ Element.moveDown 2 ] (Element.text "Join"), onPress = Just Join })
+        --             ]
+        -- )
+        -- ]
         ]
 
 
@@ -347,11 +463,27 @@ navItem label icon =
     row [] [ icon |> FeatherIcons.toHtml [] |> Element.html, el [ Element.moveRight 2, Element.moveDown 2 ] (Element.text label) ]
 
 
+portraitPhoneProductDetail : Model -> Html.Html Msg
+portraitPhoneProductDetail model =
+    let
+        product =
+            model.focusedProducts
+                |> SelectList.selected
+    in
+    layout []
+        (column [ Element.width fill ]
+            [ navbarSmall
+            , viewProduct product model
+            ]
+        )
+
+
 portraitPhone : Model -> Html.Html Msg
 portraitPhone model =
     layout []
-        (row [ Element.width fill ]
+        (column [ Element.width fill ]
             [ navbarSmall
+            , frontPageCollection model
             ]
         )
 
@@ -376,7 +508,7 @@ frontPageCollection model =
     wrappedRow [ spacing 20, centerX, padding 20, Element.width fill, Element.htmlAttribute (Html.Attributes.style "justify-content" "center") ]
         (case head of
             Just innerHead ->
-                webDataView innerHead
+                webDataView innerHead model
 
             Nothing ->
                 noResponseView
@@ -388,8 +520,8 @@ noResponseView =
     [ Element.text "No Responses yet!" ]
 
 
-webDataView : RemoteDataResponse -> List (Element Msg)
-webDataView response =
+webDataView : RemoteDataResponse -> Model -> List (Element Msg)
+webDataView response m =
     case response of
         NotAsked ->
             [ Element.text "Initialising." ]
@@ -401,32 +533,40 @@ webDataView response =
             [ Element.text ("Error: " ++ Debug.toString err) ]
 
         Success innerResponse ->
-            viewResponse innerResponse
+            viewResponse innerResponse m
 
 
-viewResponse : Response -> List (Element Msg)
-viewResponse response =
-    viewShop response
+viewResponse : Response -> Model -> List (Element Msg)
+viewResponse response m =
+    viewShop response m
 
 
-viewShop : Shop -> List (Element Msg)
-viewShop shop =
-    viewProducts shop.products
+viewShop : Shop -> Model -> List (Element Msg)
+viewShop shop m =
+    viewProducts shop.products m
 
 
-viewProducts : Paginator (List Product) -> List (Element Msg)
-viewProducts paginator =
-    List.map (\p -> viewProduct p) paginator.data
+viewProducts : Paginator (List Product) -> Model -> List (Element Msg)
+viewProducts paginator m =
+    List.map (\p -> viewProduct p m) paginator.data
 
 
-viewProduct : Product -> Element Msg
-viewProduct product =
+viewProduct : Product -> Model -> Element Msg
+viewProduct product m =
     let
         head =
             List.head product.images
     in
     Element.el []
-        (viewImage head)
+        (column []
+            [ viewImage head
+            , Element.link [ padding 25 ]
+                { url =
+                    routeToString (ProductDetailRoute (product.id |> getId))
+                , label = Element.text product.title
+                }
+            ]
+        )
 
 
 viewImage : Maybe Image -> Element Msg
@@ -453,6 +593,12 @@ hero =
 tentHere : Element Msg
 tentHere =
     tent
+        |> Element.html
+
+
+tinyTentHere : Element Msg
+tinyTentHere =
+    Tent.tinyTent
         |> Element.html
 
 
@@ -526,6 +672,76 @@ view model =
             , body =
                 [ babyview model ]
             }
+
+        ProductDetailRoute productId ->
+            case model.device.orientation of
+                Portrait ->
+                    case model.device.class of
+                        Phone ->
+                            { title = "Elm Shopify Storefront Phone"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        Tablet ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        Desktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        BigDesktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                Landscape ->
+                    case model.device.class of
+                        Phone ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        Tablet ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        Desktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
+
+                        BigDesktop ->
+                            { title = "Elm Shopify Storefront"
+                            , body =
+                                [ portraitPhoneProductDetail model
+                                , babyview model
+                                ]
+                            }
 
         HomeRoute ->
             case model.device.orientation of
@@ -631,12 +847,31 @@ init flags location key =
         , token = Just token
         , device = Element.classifyDevice { width = x, height = y }
         , currentRoute = currentRoute
+        , menuFocused = False
+        , productsAndFocusedVariant = Dict.empty
+        , focusedProducts = SelectList.fromLists [] defaultProduct []
+        , page = Home
         }
 
 
 setRoute : Maybe Route -> Model -> ( Model, Cmd Msg )
 setRoute maybeRoute model =
     case maybeRoute of
+        Just (ProductDetailRoute productId) ->
+            let
+                updatedFocusedProducts =
+                    model.focusedProducts
+                        |> SelectList.select (\p -> (p.id |> getId) == productId)
+            in
+            ( { model
+                | currentRoute = ProductDetailRoute productId
+                , page = ProductDetail
+                , focusedProducts =
+                    updatedFocusedProducts
+              }
+            , Cmd.none
+            )
+
         Just HomeRoute ->
             ( model, makeRequest model.url model.token )
 
@@ -650,13 +885,20 @@ setRoute maybeRoute model =
 type Route
     = HomeRoute
     | NotFoundRoute
+    | ProductDetailRoute String
 
 
 routeParser : UrlParser.Parser (Route -> a) a
 routeParser =
     UrlParser.oneOf
         [ UrlParser.map HomeRoute top
+        , productDetailRouteParser
         ]
+
+
+productDetailRouteParser : UrlParser.Parser (Route -> a) a
+productDetailRouteParser =
+    map ProductDetailRoute (s "products" </> string)
 
 
 fromLocation : Url -> Maybe Route
@@ -679,6 +921,9 @@ routeToString page =
     case page of
         HomeRoute ->
             absolute [ "home" ] []
+
+        ProductDetailRoute productId ->
+            absolute [ "products", productId ] []
 
         NotFoundRoute ->
             absolute [ "home" ] []
@@ -707,3 +952,54 @@ lightGrey =
 white : Color
 white =
     rgb255 255 255 255
+
+
+getSelectedOption : String -> Dict String (SelectList.SelectList Variant) -> Maybe (SelectList.SelectList Variant)
+getSelectedOption id selectedOptions =
+    Dict.get id selectedOptions
+
+
+unwrapSId : Scalar.Id -> String
+unwrapSId sid =
+    let
+        (Scalar.Id i) =
+            sid
+    in
+    i
+
+
+toOptions : String -> SelectList.SelectList Variant -> List (Option (List String) msg)
+toOptions productId variants =
+    let
+        selected =
+            variants |> SelectList.selected
+    in
+    List.map
+        (\v ->
+            if v == selected then
+                Input.optionWith [ productId, v.id |> getId ] updatedOption
+
+            else
+                Input.option [ productId, v.id |> getId ] (Element.text v.title)
+        )
+        (variants |> SelectList.toList)
+
+
+updatedOption msg =
+    case msg of
+        Input.Focused ->
+            Element.text "focus"
+
+        Input.Selected ->
+            Element.text "yas"
+
+        Input.Idle ->
+            Element.text "idle"
+
+
+getId scalarId =
+    let
+        (Scalar.Id id) =
+            scalarId
+    in
+    id
