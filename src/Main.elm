@@ -8,7 +8,7 @@ import Dict exposing (Dict)
 import Element exposing (Color, Device, DeviceClass(..), Element, Length, Orientation(..), alignRight, below, centerX, centerY, column, el, fill, layout, link, padding, paddingEach, px, rgb, rgb255, row, spaceEvenly, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
-import Element.Events
+import Element.Events exposing (onClick)
 import Element.Font as Font
 import Element.Input as Input exposing (Option, button, labelHidden, placeholder, search)
 import FeatherIcons exposing (Icon)
@@ -19,7 +19,6 @@ import Graphql.OptionalArgument as OptionalArgument exposing (OptionalArgument(.
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet, with)
 import Html exposing (Html, div, h1, p, pre, text)
 import Html.Attributes exposing (style)
-import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import PrintAny
@@ -236,6 +235,7 @@ type Msg
     | UpdateFocus Bool
     | UpdateOption (List String)
     | NoOp
+    | SwitchVariant ( Id, Id )
 
 
 main : Program Flags Model Msg
@@ -269,9 +269,28 @@ type Page
     | ProductDetail
 
 
+getVariantSelectList : Id -> Dict String (SelectList.SelectList Variant) -> Maybe (SelectList.SelectList Variant)
+getVariantSelectList id productsAndVariants =
+    productsAndVariants
+        |> Dict.get (id |> getId)
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        SwitchVariant ( productId, variantId ) ->
+            let
+                updatedVariants =
+                    model.productsAndFocusedVariant
+                        |> getVariantSelectList productId
+                        |> Maybe.withDefault (SelectList.fromLists [] defaultVariant [])
+                        |> SelectList.select (\v -> (v.id |> getId) == (variantId |> getId))
+
+                updatedProductsAndFocusedVariants =
+                    Dict.update (productId |> getId) (\v -> Just updatedVariants) model.productsAndFocusedVariant
+            in
+            ( { model | productsAndFocusedVariant = updatedProductsAndFocusedVariants }, Cmd.none )
+
         NoOp ->
             ( model, Cmd.none )
 
@@ -596,24 +615,24 @@ viewProductOnDetail product m =
                     , label = Element.text product.title
                     }
                  ]
-                    ++ viewVariants variants
+                    ++ viewVariants variants product.id
                 )
             )
 
 
-viewVariants : SelectList.SelectList Variant -> List (Element Msg)
-viewVariants variants =
-    List.map (viewVariant variants) (variants |> SelectList.toList)
+viewVariants : SelectList.SelectList Variant -> Id -> List (Element Msg)
+viewVariants variants id =
+    List.map (viewVariant variants id) (variants |> SelectList.toList)
 
 
-viewVariant : SelectList.SelectList Variant -> Variant -> Element Msg
-viewVariant variants variant =
+viewVariant : SelectList.SelectList Variant -> Id -> Variant -> Element Msg
+viewVariant variants id variant =
     if variant == SelectList.selected variants then
         Element.el [ Border.solid, Border.width 3, Element.padding 10 ]
             (Element.text variant.title)
 
     else
-        Element.el [ Element.padding 10 ]
+        Element.el [ Element.padding 10, onClick (SwitchVariant ( id, variant.id )) ]
             (Element.text variant.title)
 
 
@@ -714,10 +733,6 @@ landscapeBigDesktop model =
 
 view : Model -> Browser.Document Msg
 view model =
-    let
-        _ =
-            Debug.log "mpf" model.productsAndFocusedVariant
-    in
     case model.currentRoute of
         NotFoundRoute ->
             { title = "Not Found"
