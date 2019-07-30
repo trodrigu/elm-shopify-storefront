@@ -208,7 +208,7 @@ defaultProduct =
 
 
 defaultVariant =
-    { id = Scalar.Id "", title = "asdf", image = Nothing, price = Scalar.Money "" }
+    { id = Scalar.Id "", title = "Default Variant", image = Nothing, price = Scalar.Money "" }
 
 
 type alias Variant =
@@ -580,18 +580,25 @@ viewProductOnDetail product m =
         head =
             List.head product.images
     in
-    Element.el []
-        (column []
-            ([ viewImage head
-             , Element.link [ padding 25 ]
-                { url =
-                    routeToString (ProductDetailRoute (product.id |> getId))
-                , label = Element.text product.title
-                }
-             ]
-                ++ viewVariants variants
+    if m.productsAndFocusedVariant == Dict.empty then
+        Element.el []
+            (column []
+                [ Element.el [] (Element.text "Loading...") ]
             )
-        )
+
+    else
+        Element.el []
+            (column []
+                ([ viewImage head
+                 , Element.link [ padding 25 ]
+                    { url =
+                        routeToString (ProductDetailRoute (product.id |> getId))
+                    , label = Element.text product.title
+                    }
+                 ]
+                    ++ viewVariants variants
+                )
+            )
 
 
 viewVariants : SelectList.SelectList Variant -> List (Element Msg)
@@ -707,6 +714,10 @@ landscapeBigDesktop model =
 
 view : Model -> Browser.Document Msg
 view model =
+    let
+        _ =
+            Debug.log "mpf" model.productsAndFocusedVariant
+    in
     case model.currentRoute of
         NotFoundRoute ->
             { title = "Not Found"
@@ -899,19 +910,41 @@ setRoute : Maybe Route -> Model -> ( Model, Cmd Msg )
 setRoute maybeRoute model =
     case maybeRoute of
         Just (ProductDetailRoute productId) ->
-            let
-                updatedFocusedProducts =
-                    model.focusedProducts
-                        |> SelectList.select (\p -> (p.id |> getId) == productId)
-            in
-            ( { model
-                | currentRoute = ProductDetailRoute productId
-                , page = ProductDetail
-                , focusedProducts =
-                    updatedFocusedProducts
-              }
-            , Cmd.none
-            )
+            if model.productsAndFocusedVariant == Dict.empty then
+                ( model, makeRequest model.url model.token )
+
+            else
+                let
+                    updatedFocusedProducts =
+                        model.focusedProducts
+                            |> SelectList.select (\p -> (p.id |> getId) == productId)
+
+                    tupilize ps =
+                        List.map
+                            (\p ->
+                                let
+                                    vh =
+                                        p.variants.data
+                                            |> List.head
+                                            |> Maybe.withDefault defaultVariant
+
+                                    vrest =
+                                        p.variants.data
+                                            |> List.tail
+                                            |> Maybe.withDefault [ defaultVariant ]
+                                in
+                                ( getId p.id, vrest |> SelectList.fromLists [] vh )
+                            )
+                            ps
+                in
+                ( { model
+                    | currentRoute = ProductDetailRoute productId
+                    , page = ProductDetail
+                    , focusedProducts =
+                        updatedFocusedProducts
+                  }
+                , Cmd.none
+                )
 
         Just HomeRoute ->
             ( model, makeRequest model.url model.token )
